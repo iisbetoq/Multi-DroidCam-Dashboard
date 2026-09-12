@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { execSync } from 'child_process';
 import db from './db.js';
+import { getStorageStats } from './storageManager.js';
 
 let prevCpu = null;
 
@@ -32,7 +33,14 @@ export function getMem() {
 export function getSystemStatus(streamManager, recorder) {
   const cpu = getCpuUsage();
   const mem = getMem();
+  // gabungan semua storage enabled (Internal + External Storage)
   const storages = (() => {
+    try {
+      const stats = getStorageStats();
+      let total=0, used=0, free=0;
+      for(const s of stats) if(s.enabled && s.exists){ total+=s.total; used+=s.used; free+=s.free; }
+      if(total) return { total, used, free };
+    } catch {}
     try {
       const out = execSync('df -B1 ./recordings 2>/dev/null | tail -n 1').toString().trim().split(/\s+/);
       return { total: parseInt(out[1])||0, used: parseInt(out[2])||0, free: parseInt(out[3])||0 };
@@ -42,8 +50,14 @@ export function getSystemStatus(streamManager, recorder) {
   const online = streamManager.statusAll().filter(s => s.status === 'online').length;
   const recording = recorder.getStatus().length;
   const ffmpeg = recording;
+  // estimasi sisa durasi rekam: free / (bitrate per cam * jumlah cam aktif/total)
+  const bitrateMbps = 0.8; // 640x480 15fps H264 ~0.8 Mbps
+  const activeCams = recording || cams || 1;
+  const bytesPerSec = (bitrateMbps * 1000000 / 8) * activeCams;
+  const estSeconds = bytesPerSec ? Math.floor(storages.free / bytesPerSec) : 0;
+  const est = { seconds: estSeconds, hours: Math.floor(estSeconds/3600), days: Math.floor(estSeconds/86400) };
   return {
-    cpu, ram: mem, storage: storages,
+    cpu, ram: mem, storage: { ...storages, est },
     cameras: { total: cams, online },
     recording: { active: recording },
     ffmpeg: { processes: ffmpeg },

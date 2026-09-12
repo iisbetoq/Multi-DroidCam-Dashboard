@@ -1,5 +1,6 @@
 import express from 'express';
 import fs from 'fs';
+import { execSync } from 'child_process';
 import db from '../lib/db.js';
 import streamManager from '../lib/streamManager.js';
 import recorder from '../lib/recorder.js';
@@ -183,6 +184,32 @@ router.delete('/storage/:id', (req,res)=>{
 router.post('/storage/retention/run', (req,res)=>{
   runRetention();
   res.json({ok:true});
+});
+
+router.post('/storage/:id/mount', (req,res)=>{
+  const s=db.prepare('SELECT * FROM storage WHERE id=?').get(req.params.id);
+  if(!s) return res.status(404).json({error:'not found'});
+  try {
+    try { fs.mkdirSync(s.path,{recursive:true}); } catch {}
+    try {
+      const df=execSync(`df "${s.path}" 2>&1 | tail -n 1`).toString();
+      if (df.includes(s.path) && !df.includes('df:')) return res.json({ok:true, msg:'already mounted'});
+    } catch {}
+    try {
+      const m=execSync(`sudo -n mount -t exfat -o uid=1000,gid=1000,umask=000 /dev/sda2 "${s.path}" 2>&1 || sudo -n mount /dev/sda2 "${s.path}" 2>&1 || echo "need sudo password"`).toString();
+      if(m.includes('need sudo')) return res.json({ok:false, error:m, hint:`Jalankan di STB: sudo mkdir -p ${s.path} && sudo mount -t exfat -o uid=1000,gid=1000,umask=000 /dev/sda2 ${s.path}`});
+      return res.json({ok:true, out:m});
+    } catch(e){ return res.json({ok:false, error:e.message, hint:`Jalankan di STB: sudo mount -t exfat -o uid=1000,gid=1000,umask=000 /dev/sda2 ${s.path}`}); }
+  } catch(e){ res.json({ok:false, error:e.message}); }
+});
+router.post('/storage/:id/unmount', (req,res)=>{
+  const s=db.prepare('SELECT * FROM storage WHERE id=?').get(req.params.id);
+  if(!s) return res.status(404).json({error:'not found'});
+  try {
+    const out=execSync(`sudo -n umount "${s.path}" 2>&1 || echo "need sudo: sudo umount ${s.path}"`).toString();
+    if(out.includes('need sudo')) return res.json({ok:false, error:out, hint:`sudo umount ${s.path}`});
+    res.json({ok:true, out});
+  } catch(e){ res.json({ok:false, error:e.message}); }
 });
 
 // --- system ---

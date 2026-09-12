@@ -44,9 +44,18 @@ export function getStorageStats() {
 export function ensureStoragePaths() {
   const storages = db.prepare('SELECT * FROM storage').all();
   for (const s of storages) {
-    try { fs.mkdirSync(s.path, { recursive: true }); } catch {}
+    try { fs.mkdirSync(s.path, { recursive: true }); } catch {
+      try { execSync(`sudo mkdir -p "${s.path}" 2>&1 | head`); } catch {}
+    }
+    try {
+      const parent = path.dirname(s.path);
+      if (!fs.existsSync(parent)) try { fs.mkdirSync(parent,{recursive:true}); } catch { try{ execSync(`sudo mkdir -p "${parent}"`);}catch{} }
+    } catch {}
   }
 }
+// panggil saat start
+ensureStoragePaths();
+setInterval(ensureStoragePaths, 30000);
 
 // retention: delete oldest recordings if age > retention_days or storage > max_percent
 export function runRetention() {

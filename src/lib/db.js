@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS schedules (
 const hasStorage = db.prepare('SELECT COUNT(*) as c FROM storage').get().c;
 if (hasStorage === 0) {
   db.prepare('INSERT INTO storage (name, path) VALUES (?,?)').run('Internal', './recordings');
-  db.prepare('INSERT INTO storage (name, path) VALUES (?,?)').run('External SSD', '/media/ssd/nvr');
+  db.prepare('INSERT INTO storage (name, path) VALUES (?,?)').run('External Storage', '/media/storage/nvr');
 }
 
 // seed settings

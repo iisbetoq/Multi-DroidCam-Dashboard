@@ -79,20 +79,26 @@ $('#viewerFs').onclick=()=>{ const el=$('#viewerMain'); if(document.fullscreenEl
 // modal
 function toggleScheduleBox(){ $('#scheduleBox').classList.toggle('hidden', $('#fMode').value!=='schedule'); }
 $('#fMode').addEventListener('change', toggleScheduleBox);
-function openModal(id=null){
+async function loadStorageOptions(){
+  const storages=await api('/api/storage');
+  const sel=$('#fStorage'); sel.innerHTML='';
+  storages.forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=`${s.name} (${s.path}) ${s.exists?'':'⚠'}`; sel.appendChild(o); });
+  return storages;
+}
+async function openModal(id=null){
   editingId=id;
   $('#modal').classList.add('open');
   $('#modalTitle').textContent=id?'Edit Camera':'Add Camera';
+  await loadStorageOptions();
   if(id){
     const c=cameras.find(x=>x.id===id);
     $('#fName').value=c.name; $('#fUrl').value=c.url; $('#fEnabled').value=c.enabled?1:0;
-    $('#fRecEnabled').value=c.recording_enabled?1:0; $('#fFormat').value=c.recording_format||'mp4'; $('#fMode').value=c.recording_mode||'manual';
-    // load existing schedule if any
+    $('#fRecEnabled').value=c.recording_enabled?1:0; $('#fFormat').value=c.recording_format||'mp4'; $('#fMode').value=c.recording_mode||'manual'; $('#fStorage').value=String(c.storage_id||1);
     fetch(`/api/cameras/${id}/schedules`).then(r=>r.json()).then(rows=>{
       if(rows.length){ const s=rows[0]; $('#fSchedStart').value=s.start_time; $('#fSchedEnd').value=s.end_time; const days=s.days.split(','); document.querySelectorAll('.schedDay').forEach(cb=>cb.checked=days.includes(cb.value)); }
     });
   } else {
-    $('#fName').value=''; $('#fUrl').value='http://192.168.1.100:4747/video'; $('#fEnabled').value=1; $('#fRecEnabled').value=0; $('#fFormat').value='mp4'; $('#fMode').value='continuous';
+    $('#fName').value=''; $('#fUrl').value='http://192.168.1.100:4747/video'; $('#fEnabled').value=1; $('#fRecEnabled').value=0; $('#fFormat').value='mp4'; $('#fMode').value='continuous'; $('#fStorage').value=2;
   }
   toggleScheduleBox();
   $('#testRes').textContent='';
@@ -114,7 +120,7 @@ $('#checkCamBtn').onclick=async()=>{
 };
 $('#modalCancel').onclick=()=>$('#modal').classList.remove('open');
 $('#modalSave').onclick=async()=>{
-  const body={ name:$('#fName').value, url:$('#fUrl').value, enabled:Number($('#fEnabled').value), recording_enabled:Number($('#fRecEnabled').value), recording_format:$('#fFormat').value, recording_mode:$('#fMode').value };
+  const body={ name:$('#fName').value, url:$('#fUrl').value, enabled:Number($('#fEnabled').value), recording_enabled:Number($('#fRecEnabled').value), recording_format:$('#fFormat').value, recording_mode:$('#fMode').value, storage_id:Number($('#fStorage').value)||1 };
   if(!body.name||!body.url) return alert('Name and URL required');
   let camId=editingId;
   if(editingId) await fetch('/api/cameras/'+editingId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -159,7 +165,7 @@ async function loadRecordings(){
     const tr=document.createElement('tr');
     const size=(r.size/1024/1024).toFixed(1)+' MB';
     const dateStr=r.start_time?new Date(r.start_time).toLocaleString():'-';
-    tr.innerHTML=`<td>${dateStr}</td><td>${cameras.find(c=>c.id===r.camera_id)?.name||r.camera_id}</td><td>${r.filename}</td><td>${size}</td><td><button class="btn small" data-play="${r.id}">▶</button> <a class="btn small" href="${r.path}" download>⬇</a> <button class="btn small" data-delrec="${r.id}">🗑</button></td>`;
+    tr.innerHTML=`<td>${dateStr}</td><td>${cameras.find(c=>c.id===r.camera_id)?.name||r.camera_id}</td><td>${r.filename}</td><td>${size}</td><td><button class="btn small" data-play="${r.id}">▶</button> <a class="btn small" href="/api/recordings/${r.id}/stream" download>⬇</a> <button class="btn small" data-delrec="${r.id}">🗑</button></td>`;
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll('[data-play]').forEach(b=>b.addEventListener('click',()=>playRec(Number(b.dataset.play))));
@@ -186,23 +192,21 @@ function renderTimeline(){
   });
 }
 let queue=[], qIndex=0;
-function setupPlayer(){
-  const v=$('#player');
-  v.onended=()=>{
-    qIndex++;
-    if(qIndex<queue.length) { v.src=queue[qIndex].path.replace('./','/'); v.play(); }
-  };
-}
 function playRec(id){
-  const r=recordings.find(x=>x.id===id);
   // continuous: sort by start_time ascending, play from idx onward
   const sorted=[...recordings].sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
   const pos=sorted.findIndex(x=>x.id===id);
   queue=sorted.slice(pos);
   qIndex=0;
   const v=$('#player'); const wrap=$('#playerWrap'); wrap.style.display='block';
-  const filePath=queue[0].path.replace('./','/');
-  v.src=filePath; v.play();
+  v.src=`/api/recordings/${queue[0].id}/stream`; v.play();
+}
+function setupPlayer(){
+  const v=$('#player');
+  v.onended=()=>{
+    qIndex++;
+    if(qIndex<queue.length) { v.src=`/api/recordings/${queue[qIndex].id}/stream`; v.play(); }
+  };
 }
 $('#closePlayer').onclick=()=>{
   const v=$('#player'); const wrap=$('#playerWrap');
@@ -218,10 +222,13 @@ async function loadStorage(){
   data.forEach(s=>{
     const card=document.createElement('div'); card.className='storage-card';
     const pct=s.percent||0;
-    card.innerHTML=`<b>${s.name}</b><div style="color:var(--muted);font-size:12px">${s.path} ${s.exists?'':'⚠ not found'}</div><div class="bar"><div style="width:${pct}%"></div></div><div style="font-size:12px;margin-top:4px">${(s.used/1024/1024/1024).toFixed(1)} / ${(s.total/1024/1024/1024).toFixed(1)} GB • ${pct}%</div>`;
+    const isExternal=s.path.includes('/media');
+    card.innerHTML=`<b>${s.name}</b><div style="color:var(--muted);font-size:12px">${s.path} ${s.exists?'':'⚠ not found'}</div><div class="bar"><div style="width:${pct}%"></div></div><div style="font-size:12px;margin-top:4px">${(s.used/1024/1024/1024).toFixed(1)} / ${(s.total/1024/1024/1024).toFixed(1)} GB • ${pct}%</div><div style="margin-top:8px;display:flex;gap:6px">${isExternal?`<button class="btn small" onclick="mountStorage(${s.id})">Mount</button><button class="btn small" onclick="unmountStorage(${s.id})">Unmount</button>`:''}</div><div id="mountMsg${s.id}" style="font-size:11px;color:var(--muted);margin-top:4px"></div>`;
     g.appendChild(card);
   });
 }
+async function mountStorage(id){ const el=document.getElementById('mountMsg'+id); el.textContent='Mounting...'; const r=await fetch(`/api/storage/${id}/mount`,{method:'POST'}).then(r=>r.json()); el.textContent=r.ok?`✅ ${r.out||'mounted'}`:`❌ ${r.error||r.hint||'need sudo'}`; setTimeout(loadStorage,1500); }
+async function unmountStorage(id){ const el=document.getElementById('mountMsg'+id); el.textContent='Unmounting...'; const r=await fetch(`/api/storage/${id}/unmount`,{method:'POST'}).then(r=>r.json()); el.textContent=r.ok?`✅ ${r.out||'unmounted'}`:`❌ ${r.error||r.hint||''}`; setTimeout(loadStorage,1500); }
 $('#runRetention').onclick=async()=>{ await fetch('/api/storage/retention/run',{method:'POST'}); loadStorage(); };
 
 // settings
@@ -230,7 +237,8 @@ async function loadSettings(){
   $('#setRetention').value=s.retention_days||7;
   $('#setMaxStorage').value=s.max_storage_percent||80;
   const sys=await api('/api/system/status');
-  $('#sysInfo').innerHTML=`CPU ${sys.cpu}% • RAM ${(sys.ram.used/1024/1024).toFixed(0)} MB / ${(sys.ram.total/1024/1024).toFixed(0)} MB • Storage ${(sys.storage.used/1024/1024/1024).toFixed(1)} / ${(sys.storage.total/1024/1024/1024).toFixed(1)} GB • Cameras ${sys.cameras.online}/${sys.cameras.total} • Recording ${sys.recording.active} • FFmpeg ${sys.ffmpeg.processes} • Uptime ${Math.floor(sys.uptime/60)}m`;
+  const est=sys.storage.est; let estStr=est&&est.days>0?` • Est. ${est.days}d`:est&&est.hours>0?` • Est. ${est.hours}h`:'';
+  $('#sysInfo').innerHTML=`CPU ${sys.cpu}% • RAM ${(sys.ram.used/1024/1024).toFixed(0)} MB / ${(sys.ram.total/1024/1024).toFixed(0)} MB • Storage ${(sys.storage.used/1024/1024/1024).toFixed(1)} / ${(sys.storage.total/1024/1024/1024).toFixed(1)} GB${estStr} • Cameras ${sys.cameras.online}/${sys.cameras.total} • Recording ${sys.recording.active} • FFmpeg ${sys.ffmpeg.processes} • Uptime ${Math.floor(sys.uptime/60)}m`;
 }
 $('#saveSettings').onclick=async()=>{
   await fetch('/api/system/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({retention_days:$('#setRetention').value,max_storage_percent:$('#setMaxStorage').value})});
@@ -242,8 +250,11 @@ const es=new EventSource('/api/events');
 es.onmessage=e=>{
   const d=JSON.parse(e.data);
   const sys=d.system;
-  hdrStats.innerHTML=`<span>🟢 Server Online</span> <span>Cameras: <b>${sys.cameras.online} / ${sys.cameras.total} Online</b></span> <span>Recording: <b>${sys.recording.active}</b></span> <span>CPU: <b>${sys.cpu}%</b></span> <span>RAM: <b>${(sys.ram.used/1024/1024).toFixed(0)} MB</b></span> <span>Storage: <b>${sys.storage.total?Math.round(sys.storage.used/sys.storage.total*100):0}%</b></span>`;
-  // update cameras status live
+  const est=sys.storage.est;
+  let estStr='';
+  if(est && est.days>0) estStr=` • Est. ${est.days}d`;
+  else if(est && est.hours>0) estStr=` • Est. ${est.hours}h`;
+  hdrStats.innerHTML=`<span>🟢 Server Online</span> <span>Cameras: <b>${sys.cameras.online} / ${sys.cameras.total} Online</b></span> <span>Recording: <b>${sys.recording.active}</b></span> <span>CPU: <b>${sys.cpu}%</b></span> <span>RAM: <b>${(sys.ram.used/1024/1024).toFixed(0)} MB</b></span> <span>Storage: <b>${sys.storage.total?Math.round(sys.storage.used/sys.storage.total*100):0}%</b>${estStr} • Uptime ${Math.floor(sys.uptime/60)}m</span>`;
   if(d.cameras){ cameras=d.cameras.map(c=>{ const old=cameras.find(o=>o.id===c.id); return {...(old||{}),...c}; }); renderGrid(); }
 };
 
