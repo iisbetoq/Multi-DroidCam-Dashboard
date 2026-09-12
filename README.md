@@ -1,15 +1,10 @@
 # Multi DroidCam NVR Dashboard
 
-![DroidCam NVR](DroidCam-NVR.jpg)
-
 Mini NVR hemat resource untuk beberapa HP Android **DroidCam Free** (`com.dev47apps.droidcam`) dengan **STB Armbian ARM64** sebagai server. Live monitoring, recording segmented otomatis, playback berurutan — tanpa Docker, tanpa transcoding default.
 
 > `Android (DroidCam) → WiFi/LAN → STB Armbian → NVR Server → Web Dashboard → Internal/External Storage`
 
 ## Screenshots
-
-### Cameras - Grid View
-![Cameras](DroidCam-NVR.jpg)
 
 ### Camera Management
 ![Camera Management](DroidCam-NVR-Camera.jpg)
