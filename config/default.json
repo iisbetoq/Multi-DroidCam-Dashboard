@@ -1,0 +1,13 @@
+{
+  "port": 8080,
+  "host": "0.0.0.0",
+  "db_path": "./data/nvr.db",
+  "recordings_root": "./recordings",
+  "segment_duration": 300,
+  "max_segment_size_mb": 100,
+  "retention_days": 7,
+  "max_storage_percent": 80,
+  "auth_enabled": false,
+  "auth_username": "admin",
+  "auth_password": "admin"
+}

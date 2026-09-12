@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DroidCam NVR</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <h1>📹 DroidCam NVR</h1>
+  <div class="hdr-stats" id="hdrStats">Loading...</div>
+</header>
+<nav>
+  <button data-tab="cameras" class="active">📹 Cameras</button>
+  <button data-tab="recordings">🎥 Recordings</button>
+  <button data-tab="storage">💾 Storage</button>
+  <button data-tab="settings">⚙ Settings</button>
+  <button id="checkCamBtn" class="btn" style="margin-left:auto">🔄 Check Cameras</button>
+  <button id="addCamBtn" class="btn primary">+ Add Camera</button>
+</nav>
+<main>
+  <section id="tab-cameras">
+    <div id="grid" class="grid"></div>
+  </section>
+  <section id="tab-recordings" class="hidden">
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <select id="filterCam"><option value="">All Cameras</option></select>
+      <input type="date" id="filterDate">
+      <button id="filterBtn" class="btn">Filter</button>
+      <button id="refreshRec" class="btn">Refresh</button>
+    </div>
+    <div id="timeline" class="timeline"></div>
+    <table>
+      <thead><tr><th>Date</th><th>Camera</th><th>File</th><th>Size</th><th>Action</th></tr></thead>
+      <tbody id="recTable"></tbody>
+    </table>
+    <div id="playerWrap" style="margin-top:12px;display:none;position:relative;background:#000;border-radius:8px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#1a1e26;border-bottom:1px solid var(--border)"><b style="font-size:12px">▶ Playback</b><button id="closePlayer" class="btn small">✕ Close</button></div>
+      <video id="player" class="video-js" controls style="width:100%;max-height:60vh;background:#000"></video>
+    </div>
+  </section>
+  <section id="tab-storage" class="hidden">
+    <div id="storageGrid" class="storage-grid"></div>
+    <div style="margin-top:12px"><button id="runRetention" class="btn">Run Retention Now</button></div>
+  </section>
+  <section id="tab-settings" class="hidden">
+    <h3>System</h3>
+    <div id="sysInfo" style="margin:8px 0;color:var(--muted)"></div>
+    <h3 style="margin-top:14px">Settings</h3>
+    <div class="row">
+      <div class="field"><label>Keep recordings (days)</label><input id="setRetention" type="number" min="1"></div>
+      <div class="field"><label>Max storage %</label><input id="setMaxStorage" type="number" min="50" max="95"></div>
+    </div>
+    <button id="saveSettings" class="btn primary">Save</button>
+    <p style="margin-top:10px;color:var(--muted);font-size:12px">STB Armbian • SQLite • FFmpeg • No Docker • <span id="ver">v1.1</span></p>
+  </section>
+</main>
+
+<!-- viewer overlay -->
+<div id="viewer" class="viewer">
+  <div class="viewer-bar">
+    <div><b id="viewerName">CAM 01</b> <span id="viewerStatus" class="badge online">ONLINE</span></div>
+    <div style="display:flex;gap:8px">
+      <button id="viewerRec" class="btn danger">⏺ REC</button>
+      <button id="viewerStop" class="btn">■ STOP</button>
+      <button id="viewerFs" class="btn">⛶ Fullscreen</button>
+      <button id="viewerClose" class="btn">✕ Close</button>
+    </div>
+  </div>
+  <div class="viewer-main" id="viewerMain"><img id="viewerImg" alt="live"></div>
+  <div id="viewerThumbs" class="thumbs"></div>
+</div>
+
+<!-- modal -->
+<div id="modal" class="modal">
+  <div class="modal-box">
+    <h3 id="modalTitle">Add Camera</h3>
+    <div class="field"><label>Camera Name</label><input id="fName" placeholder="Bedroom"></div>
+    <div class="field"><label>Stream URL (http://IP:4747/video)</label><input id="fUrl" placeholder="http://192.168.1.101:4747/video"></div>
+    <div class="row">
+      <div class="field" style="flex:1"><label>Enabled</label><select id="fEnabled"><option value="1">Yes</option><option value="0">No</option></select></div>
+      <div class="field" style="flex:1"><label>Recording</label><select id="fRecEnabled"><option value="0">OFF</option><option value="1">ON</option></select></div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:1"><label>Format</label><select id="fFormat"><option value="mp4">MP4 H.264 (kecil)</option><option value="avi">AVI MJPEG copy (hemat CPU)</option></select></div>
+      <div class="field" style="flex:1"><label>Mode</label><select id="fMode"><option value="manual">Manual</option><option value="continuous">Continuous</option><option value="schedule">Schedule</option></select></div>
+    </div>
+    <div id="scheduleBox" class="hidden" style="border:1px dashed var(--border);padding:10px;border-radius:8px;margin-top:8px">
+      <b style="font-size:12px">Schedule (dormant - aktif jika Mode=Schedule)</b>
+      <div class="row" style="margin-top:6px">
+        <div class="field" style="flex:1"><label>Start (HH:MM)</label><input id="fSchedStart" type="time" value="22:00"></div>
+        <div class="field" style="flex:1"><label>End (HH:MM)</label><input id="fSchedEnd" type="time" value="06:00"></div>
+      </div>
+      <div class="field"><label>Hari</label><div style="display:flex;gap:6px;flex-wrap:wrap;font-size:12px"><label><input type="checkbox" class="schedDay" value="1" checked> Sen</label><label><input type="checkbox" class="schedDay" value="2" checked> Sel</label><label><input type="checkbox" class="schedDay" value="3" checked> Rab</label><label><input type="checkbox" class="schedDay" value="4" checked> Kam</label><label><input type="checkbox" class="schedDay" value="5" checked> Jum</label><label><input type="checkbox" class="schedDay" value="6" checked> Sab</label><label><input type="checkbox" class="schedDay" value="0" checked> Min</label></div></div>
+      <div style="font-size:11px;color:var(--muted)">Contoh: 22:00-06:00 = rekam malam saja. Kosong = tidak rekam (hemat CPU). Schedule dicek tiap 60s, tidak jalan untuk Manual/Continuous.</div>
+    </div>
+    <div class="field"><label>Test</label><button id="testBtn" class="btn">Test Connection</button> <span id="testRes" style="font-size:12px;color:var(--muted)"></span></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+      <button id="modalCancel" class="btn">Cancel</button>
+      <button id="modalSave" class="btn primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js" type="module"></script>
+</body>
+</html>
