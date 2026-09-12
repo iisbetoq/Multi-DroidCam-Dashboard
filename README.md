@@ -6,6 +6,23 @@ Mini NVR hemat resource untuk beberapa HP Android **DroidCam Free** (`com.dev47a
 
 > `Android (DroidCam) → WiFi/LAN → STB Armbian → NVR Server → Web Dashboard → Internal/External Storage`
 
+## Screenshots
+
+### Cameras - Grid View
+![Cameras](DroidCam-NVR.jpg)
+
+### Camera Management
+![Camera Management](DroidCam-NVR-Camera.jpg)
+
+### Recordings - Library & Playback
+![Recordings](DroidCam-NVR-Recording.jpg)
+
+### Storage - Internal & External
+![Storage](DroidCam-NVR-Storage.jpg)
+
+### Settings - System Monitor
+![Settings](DroidCam-NVR-Settings.jpg)
+
 ## Fitur
 
 - **Multi-camera grid** + header `Server Online • Cameras 4/5 • Recording 3 • CPU/RAM/Storage`
