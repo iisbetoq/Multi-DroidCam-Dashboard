@@ -1,6 +1,6 @@
 # Multi DroidCam NVR Dashboard
 
-Mini NVR hemat resource untuk beberapa HP Android **DroidCam Free** (`com.dev47apps.droidcam`) dengan **STB Armbian ARM64** sebagai server. Live monitoring, recording segmented otomatis, playback berurutan — tanpa Docker, tanpa transcoding default.
+Lightweight NVR for multiple Android phones running **DroidCam Free** (`com.dev47apps.droidcam`) with **STB Armbian ARM64** as server. Live monitoring, segmented auto-recording, sequential playback — no Docker, no default transcoding.
 
 > `Android (DroidCam) → WiFi/LAN → STB Armbian → NVR Server → Web Dashboard → Internal/External Storage`
 
@@ -18,50 +18,50 @@ Mini NVR hemat resource untuk beberapa HP Android **DroidCam Free** (`com.dev47a
 ### Settings - System Monitor
 ![Settings](DroidCam-NVR-Settings.jpg)
 
-## Fitur
+## Features
 
 - **Multi-camera grid** + header `Server Online • Cameras 4/5 • Recording 3 • CPU/RAM/Storage`
-- **Click → large viewer** + thumbnail + fullscreen, tetap di halaman sama
-- **Camera management** CRUD, enable/disable, test connection, rename, URL configurable (`http://IP:4747/mjpegfeed` atau `/video`)
-- **Stream Manager** single upstream, reconnect, MD5 freeze detection (60 frame), timeout
-- **Live view** MJPEG proxy passthrough (tanpa transcode), HLS/remux fallback
-- **Recording** manual / continuous / schedule (dormant), tombol `⏺ REC` per kamera
-- **Segmented** `5 menit` + `100 MB` → `recordings/cam01/2026/09/12/19-00-00.mp4` (bukan 1 file panjang)
-- **Stream copy** `H264` jika source H264, transcode `MJPEG→H264` via `libx264` (fallback `h264_v4l2m2m`) — single-client pipe sharing untuk DroidCam Free
-- **Storage** internal `/mnt/nvr`, external SSD `/media/ssd/nvr`, custom — Storage Manager + `df` stats
-- **Recording library** filter camera/date, `▶ Play ⬇ Download 🗑 Delete`, **continuous playback** + timeline
-- **Retention** `7 hari` + `80%` max storage → hapus oldest, skip file aktif
+- **Click → large viewer** + thumbnails + fullscreen, same page
+- **Camera management** CRUD, enable/disable, test connection, rename, configurable URL (`http://IP:4747/mjpegfeed` or `/video`)
+- **Stream Manager** single upstream, reconnect, MD5 freeze detection (60 frames), timeout
+- **Live view** MJPEG proxy passthrough (no transcode), HLS/remux fallback
+- **Recording** manual / continuous / schedule (dormant), `⏺ REC` button per camera
+- **Segmented** `5 minutes` + `100 MB` → `recordings/cam01/2026/09/12/19-00-00.mp4` (not a single long file)
+- **Stream copy** `H264` if source is H264, transcode `MJPEG→H264` via `libx264` (fallback `h264_v4l2m2m`) — single-client pipe sharing for DroidCam Free
+- **Storage** internal `/media/storage/nvr`, external `/media/storage/nvr`, custom — Storage Manager + `df` stats
+- **Recording library** filter by camera/date, `▶ Play ⬇ Download 🗑 Delete`, **continuous playback** + timeline
+- **Retention** `7 days` + `80%` max storage → delete oldest, skip active file
 - **System monitor** `/proc/stat`, `/proc/meminfo`, `statvfs`, SSE realtime
-- **Deploy** `install.sh start.sh stop.sh update.sh` + `systemd droidcam-nvr.service` di `http://STB-IP:8080`
+- **Deploy** `install.sh start.sh stop.sh update.sh` + `systemd droidcam-nvr.service` at `http://STB-IP:8080`
 
-## Arsitektur
+## Architecture
 
 ```
 Camera Source → Stream Manager → ┬ Viewer (MJPEG proxy)
                                  └ Recorder (FFmpeg segment)
 ```
 
-- 1 upstream per kamera, dishare ke banyak viewer + recorder via pipe (DroidCam single-client fix)
-- `MJPEG → JPEG → libx264 → segmented MP4` atau `MJPEG copy → avi`
-- `SSE /api/events` untuk camera/storage/system realtime
+- 1 upstream per camera, shared to many viewers + recorder via pipe (DroidCam single-client fix)
+- `MJPEG → JPEG → libx264 → segmented MP4` or `MJPEG copy → avi`
+- `SSE /api/events` for camera/storage/system realtime
 
 ## Requirements
 
-- STB Armbian ARM64, Node 20+, FFmpeg 7+, `better-sqlite3` via `node:sqlite` (built-in)
-- HP Android DroidCam Free, WiFi 5GHz sama dengan STB
+- STB Armbian ARM64, Node 20+, FFmpeg 7+, `node:sqlite` (built-in)
+- Android phones with DroidCam Free, same 5GHz WiFi as STB
 
 ## Quick Start
 
 ```bash
 git clone <repo> && cd Multi-DroidCam-Dashboard
 ./install.sh          # install Node, FFmpeg, npm deps, enable systemd
-./start.sh            # atau sudo systemctl start droidcam-nvr
+./start.sh            # or sudo systemctl start droidcam-nvr
 # http://STB-IP:8080
 ```
 
 Scripts:
 - `install.sh` — deps + `systemctl enable`
-- `start.sh` — `pm2` atau `nohup` fallback
+- `start.sh` — `pm2` or `nohup` fallback
 - `stop.sh` — stop + kill ffmpeg
 - `update.sh` — `git pull` + restart
 
@@ -71,19 +71,19 @@ sudo cp droidcam-nvr.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now droidcam-nvr
 ```
 
-## Penggunaan
+## Usage
 
-1. **Cameras** → `+ Add Camera` isi `http://192.168.1.69:4747/mjpegfeed` (atau `/video`, keduanya support)
-2. `🔄 Check Cameras` → popup `✅ OK` → thumb langsung tampil (tanpa klik)
-3. Klik card → large viewer, `⏺ REC` untuk manual, `⛶ Fullscreen`
-4. **Recordings** → filter, `▶` play berurutan, `⬇` download, timeline klik segment
-5. **Storage** → lihat `Internal/External`, `Run Retention Now`
+1. **Cameras** → `+ Add Camera` enter `http://192.168.1.69:4747/mjpegfeed` (or `/video`, both supported)
+2. `🔄 Check Cameras` → popup `✅ OK` → thumbnails appear instantly
+3. Click card → large viewer, `⏺ REC` for manual, `⛶ Fullscreen`
+4. **Recordings** → filter, `▶` sequential play, `⬇` download, click timeline segment
+5. **Storage** → view `Internal/External`, `Mount/Unmount`, `Run Retention Now`
 6. **Settings** → `Keep recordings` + `Max storage`
 
-Mode recording:
-- `manual` — tombol per kamera
-- `continuous` — selalu rekam saat `recording ON`
-- `schedule` — `22:00-06:00` + hari (dormant, cek tiap 60s)
+Recording modes:
+- `manual` — button per camera
+- `continuous` — always record when `recording ON`
+- `schedule` — `22:00-06:00` + days (dormant, checked every 60s)
 
 ## REST API
 
@@ -106,13 +106,15 @@ DELETE /api/recordings/:id
 GET    /api/recordings/:id/stream
 
 GET    /api/storage
-GET    /api/system/status               # CPU/RAM/storage/cameras/ffmpeg
+POST   /api/storage/:id/mount
+POST   /api/storage/:id/unmount
+GET    /api/system/status               # CPU/RAM/storage/cameras/ffmpeg + Est. remaining
 GET    /api/system/settings
 PUT    /api/system/settings
 GET    /api/events                      # SSE
 ```
 
-## Direktori
+## Directory
 
 ```
 recordings/cam01/2026/09/12/19-00-00.mp4
@@ -121,10 +123,10 @@ public/ (grid, viewer, timeline)
 src/lib/{db,streamManager,recorder,storageManager,systemMonitor}
 ```
 
-## Build Phase
+## Build Phases
 
-Phase 1 CRUD+grid, Phase 2 FFmpeg segment, Phase 3 storage/playback, Phase 4 retention/reconnect, Phase 5 monitor/systemd — semua done.
+Phase 1 CRUD+grid, Phase 2 FFmpeg segment, Phase 3 storage/playback, Phase 4 retention/reconnect, Phase 5 monitor/systemd — all done.
 
-## Lisensi
+## License
 
 MIT — STB Armbian, no Docker, SQLite, FFmpeg stream-copy priority.
